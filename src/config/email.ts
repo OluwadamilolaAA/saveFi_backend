@@ -16,3 +16,17 @@ export const sendEmail = async (to: string, subject: string, text: string) => {
     text,
   });
 };
+
+export const welcomeReferralEmail = (username: string, referralCode: string) => {
+  return {
+    subject: "Welcome to SaveFi! Here's your referral code",
+    text: `Hi ${username},
+
+Welcome to SaveFi! Your personal referral code is: ${referralCode}
+
+Share it with your friends to earn rewards. You can also view your referral dashboard here: https://yourapp.com/referrals
+
+Thanks,
+The SaveFi Team`
+  };
+};

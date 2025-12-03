@@ -3,12 +3,16 @@ import User from "../models/user.schema";
 import bcrypt from "bcrypt";
 import jwt, { Secret } from "jsonwebtoken";
 import { sendEmail } from "../config/email";
+import { welcomeReferralEmail } from "../config/email";
 
 const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 // Generate 6-digit OTP
 const generateOtp = () =>
   Math.floor(100000 + Math.random() * 900000).toString();
+
+const generateReferralCode = () =>
+  Math.random().toString(36).substring(2, 10).toUpperCase();
 
 const jwtSecret: Secret = process.env.JWT_SECRET || "secret";
 const jwtExpiry = "7d";
@@ -35,12 +39,15 @@ export const register = async (req: Request, res: Response) => {
 
     const otp = generateOtp();
 
+    const referrerCode = generateReferralCode();
+
     const user = await User.create({
       username,
       email,
       password: hashedPassword,
       otp,
       otpExpires: new Date(Date.now() + OTP_TTL_MS),
+      referrerCode,
     });
 
     await sendEmail(
@@ -48,6 +55,8 @@ export const register = async (req: Request, res: Response) => {
       "Verify your account",
       `Your OTP is ${otp}. It expires in 10 minutes.`
     );
+    const referralMessage = welcomeReferralEmail(username, referrerCode);
+    await sendEmail(email, referralMessage.subject, referralMessage.text);
 
     return res.status(201).json({
       message: "Registration successful. OTP sent to email.",
@@ -214,6 +223,45 @@ export const resetPassword = async (req: Request, res: Response) => {
     return res.json({ message: "Password reset successful" });
   } catch (err) {
     console.error("Reset Password Error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// ======================= COMPLETE PROFILE =======================
+
+export const completeProfile = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const { firstName, lastName, referralCode } = req.body;
+
+    if (!firstName || !lastName)
+      return res
+        .status(400)
+        .json({ message: "First and last name are required" });
+
+    const user = await User.findById(userId);
+    if (!user)
+      return res.status(404).json({ message: "User not found" });
+
+    user.firstName = firstName;
+    user.lastName = lastName;
+
+    //  referral code is optional
+    if (referralCode) {
+      const refUser = await User.findOne({ referrerCode: referralCode });
+      if (!refUser)
+        return res.status(400).json({ message: "Invalid referral code" });
+
+      user.referredBy = referralCode; 
+    }
+
+    user.hasCompletedProfile = true; 
+
+    await user.save();
+
+    return res.json({ message: "Profile completed successfully" });
+  } catch (err) {
+    console.error("Complete Profile Error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };

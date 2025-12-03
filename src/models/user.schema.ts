@@ -10,6 +10,7 @@ export interface IUser extends Document {
   otpExpires?: Date;
   isVerified: boolean;
   referrerCode?: string;
+  referredBy?: string;
   hasCompletedProfile: boolean;
 }
 
@@ -25,7 +26,8 @@ const UserSchema = new Schema<IUser>(
     // Popup details
     firstName: { type: String },
     lastName: { type: String },
-    referrerCode: { type: String },
+    referrerCode: { type: String, unique: true },
+    referredBy: { type: String },
 
     // To know if popup should show
     hasCompletedProfile: { type: Boolean, default: false },
